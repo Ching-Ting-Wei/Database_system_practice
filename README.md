@@ -53,4 +53,3 @@ abcd already exist
     * Change: Put traversal functions and search funtion into tree.c
 ## target 每周目標
 
-### 第二周
