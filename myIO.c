@@ -1,12 +1,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wchar.h>
 #include "myDS.h"
 #include "myIO.h"
+#include "myAlgo.h"
+#include "tree.h"
+#include "myUI.h"
 static FILE *outputSongFile;
-void read_song_name(char buffer[MAX_SONG_NAME + 1])
+char *read_wstring()
 {
     char c;
+    char buffer[MAX_SONG_NAME + 1];
     int length = 0;
     while ((c = getchar()) != '\n' && c != EOF)
     {
@@ -14,8 +19,13 @@ void read_song_name(char buffer[MAX_SONG_NAME + 1])
         {
             buffer[length++] = c;
         }
+        else
+        {
+            break;
+        }
     }
     buffer[length] = '\0';
+
     if (strlen(buffer) == MAX_SONG_NAME)
     {
 
@@ -23,18 +33,12 @@ void read_song_name(char buffer[MAX_SONG_NAME + 1])
         buffer[length - 2] = '.';
         buffer[length - 3] = '.';
     }
-    return;
+    char *result = malloc(length * sizeof(char));
+    //printf("%p\n", result);
+    strcpy(result, buffer);
+    return result;
 }
-void read_line(item *data)
-{
-    char c;
-    char buf[MAX_SONG_NAME + 1];
-    scanf(" %d ", &data->index);
-    read_song_name(buf);
-    data->song_name = (char *)malloc(sizeof(buf));
-    strncpy(data->song_name, buf, MAX_SONG_NAME);
-    return;
-}
+
 void Preorder_traverse(node *root, int output_choose)
 {
     if (root == NULL)
@@ -43,37 +47,32 @@ void Preorder_traverse(node *root, int output_choose)
     }
     if (output_choose == 1)
     {
-        fprintf(outputSongFile, "%d ", root->data->index);
+        // fprintf(outputSongFile, "%d ", root->data->index);
         fprintf(outputSongFile, "%s", root->data->song_name);
         fprintf(outputSongFile, "\n");
     }
     else if (output_choose == 2)
     {
-        printf("%d %s\n", root->data->index, root->data->song_name);
+        // printf("%d %ls\n", root->data->index, root->data->song_name);
     }
     Preorder_traverse(root->left_child, output_choose);
     Preorder_traverse(root->right_child, output_choose);
 }
 
-void Inorder_traverse(node *root, int output_choose)
+void Inorder_traverse(song *root)
 {
     if (root == NULL)
     {
         return;
     }
-    if (output_choose == 1)
-    {
-        Inorder_traverse(root->left_child, output_choose);
-        fprintf(outputSongFile, "%d ", root->data->index);
-        fprintf(outputSongFile, "%s", root->data->song_name);
-        fprintf(outputSongFile, "\n");
-    }
-    else if (output_choose == 2)
-    {
-        Inorder_traverse(root->left_child, output_choose);
-        printf("%d %s\n", root->data->index, root->data->song_name);
-    }
-    Inorder_traverse(root->right_child, output_choose);
+    Inorder_traverse(root->left_child);
+    fprintf(outputSongFile, "%s,", root->song_name);
+    fprintf(outputSongFile, "%s,", root->artist);
+    fprintf(outputSongFile, "%.2f,", root->length);
+    fprintf(outputSongFile,"%d/%d/%d %d:%d,",root->times.year,root->times.month,root->times.day,root->times.hour,root->times.minute);
+    fprintf(outputSongFile, "%d", root->like);
+    fprintf(outputSongFile, "\n");
+    Inorder_traverse(root->right_child);
 }
 
 void Postorder_traverse(node *root, int output_choose)
@@ -82,89 +81,235 @@ void Postorder_traverse(node *root, int output_choose)
     {
         return;
     }
+    Postorder_traverse(root->left_child, output_choose);
+    Postorder_traverse(root->right_child, output_choose);
     if (output_choose == 1)
     {
-        Postorder_traverse(root->left_child, output_choose);
-        Postorder_traverse(root->right_child, output_choose);
-        fprintf(outputSongFile, "%d ", root->data->index);
+        // fprintf(outputSongFile, "%d ", root->data->index);
         fprintf(outputSongFile, "%s", root->data->song_name);
         fprintf(outputSongFile, "\n");
     }
     else if (output_choose == 2)
     {
-        Postorder_traverse(root->left_child, output_choose);
-        Postorder_traverse(root->right_child, output_choose);
-        printf("%d %s\n", root->data->index, root->data->song_name);
+
+        // printf("%d %ls\n", root->data->index, root->data->song_name);
     }
 }
 
-int read_SongFile()
+void read_SongFile(song **song_data)
 {
     FILE *songFile;
 
     /* allocation of the buffer for every line in the File */
-    char *buf = malloc(MAX_SONG_NAME + 10);
-    char *tmp;
-
-    /* if the space could not be allocaed, return an error */
-    if (buf == NULL)
-    {
-        printf("No memory\n");
-        return 1;
-    }
-
-    if ((songFile = fopen("songFile.csv", "r")) == NULL) // Reading a file
+    char buf[300];
+    /* if the space could not be allocated, return an error */
+    if ((songFile = fopen("songFile.csv", "r")) == NULL) // Reading a filemnnnnn
     {
         printf("File could not be opened.\n");
     }
 
     while (fgets(buf, 255, songFile) != NULL)
     {
+        // printf("buf:%s",buf);
         if ((strlen(buf) > 0) && (buf[strlen(buf) - 1] == '\n'))
             buf[strlen(buf) - 1] = '\0';
+        song *songs = malloc(sizeof(song));
+        upload_time(&(songs->times));
+        //print_systimes(songs->times);
+        // Define the delimeter of the string
+        char delim[] = ",";
 
-        item *song = (item *)malloc(sizeof(song));
-        tmp = strtok(buf, ",");
-        song->index = atoi(tmp);
+        // Call the wcstok() method
+        char *tmp = strtok(buf, delim);
+        songs->song_name = (char *)malloc(sizeof(char) * (strlen(tmp) + 1));
+        strcpy(songs->song_name, tmp);
+        tmp = strtok(NULL, delim);
+        songs->artist = (char *)malloc(sizeof(char) * (strlen(tmp) + 1));
+        strcpy(songs->artist, tmp);
+        tmp = strtok(NULL, delim);
+        for (int i = 0; i < strlen(tmp); i++)
+        {
+            if (tmp[i] == ':')
+            {
+                tmp[i] = '.';
+                break;
+            }
+        }
 
-        tmp = strtok(NULL, ",");
-        song->song_name = (char *)malloc(sizeof(tmp));
-        strcpy(song->song_name, tmp);
+        float time = atof(tmp);
+        songs->length = time;
 
-        build_tree(&root, song, root, 0);
+        songs->left_child = NULL;
+        songs->right_child = NULL;
+        songs->parent = NULL;
+
+        build_song_data(song_data, songs);
     }
     fclose(songFile);
-    return 0;
+    return;
+}
+// void write_SongFile(node *root)
+// {
+//     outputSongFile = fopen("output.csv", "w");
+//     if (root == NULL)
+//     {
+//         return;
+//     }
+//     fclose(outputSongFile);
+//     return;
+// }
+
+void output_song(song *cur_songlist)
+{
+    // output all song name,artist,time in cur_songlist
+    /*
+        Maybe :
+        Inorder_traverse(cur_songlist,2);
+        I guess...
+    */
+    if (cur_songlist == NULL)
+    {
+        return;
+    }
+    output_song(cur_songlist->left_child);
+    printf(RESET"%s"BLUE" %s"YELLOW" %.2f "RESET, cur_songlist->song_name,cur_songlist->artist,cur_songlist->length);
+    if(cur_songlist->like == 1){
+        printf(RED HEART RESET" ");
+    }
+    //printf("%d/%d/%d %d:%d\n");
+    print_systimes(cur_songlist->times);
+    output_song(cur_songlist->right_child);
+    
 }
 
-int write_SongFile(node *root)
+void output_songlist(node *songlist_tree)
 {
-    outputSongFile = fopen("output.csv", "w");
-    if (root == NULL)
+    // output all songlist name in songlist_tree
+    // char *filename;
+    // wcstombs(filename, songlist_tree->songlist_name, 101);
+    // outputSongFile = fopen(filename, "w");
+    if (songlist_tree == NULL)
     {
-        return 0;
+        return;
     }
-    Inorder_traverse(root, 1);
+    output_songlist(songlist_tree->left_child);
+    printf("%s \n", songlist_tree->songlist_name);
+    output_songlist(songlist_tree->right_child);
+}
+
+void Export_songlist(song *cur_songlist, char *Filename)
+{
+    // Export cur_songlist's song as .csv file.
+    char filename[MAX_SONG_NAME+1];
+    strcpy(filename,Filename);
+    strcat(filename, ".csv");
+    //printf("filenames:'%s'\n",filename);
+    
+    outputSongFile = fopen(filename, "w");
+    if (cur_songlist == NULL)
+    {
+        return;
+    }
+    //fprintf(outputSongFile,"Title,Artist,Song,length(min),last Edited time\n");
+    Inorder_traverse(cur_songlist);
     fclose(outputSongFile);
-    return 0;
+    return;
 }
 
-node *search(node *root, item *target)
+void Import_songlist(node **songlist_tree, char songlist_name[])
 {
-    node *curr = (node *)malloc(sizeof(curr));
-    curr = root;
-
-    while (curr != NULL && strcmp(target->song_name, curr->data->song_name) != 0)
+    /*
+        Import a .csv file which file name is {songlist_name}.csv, as a songlist.
+        if there's not , print "Missing File : {songlist_name}\n".
+    */
+    FILE *songFile;
+    char filename[MAX_SONG_NAME+1];
+    strcpy(filename,songlist_name);
+    strcat(filename, ".csv");
+    //printf("%s\n",filename);
+    /* if the space could not be allocated, return an error */
+    if ((songFile = fopen(filename, "r")) == NULL) // Reading a file
     {
-        
-        if (strcmp(curr->data->song_name, target->song_name) > 0)
-        {
-            curr = curr->left_child;
-        }
-        else
-        {
-            curr = curr->right_child;
-        }
+        printf("Missing File : {%s}\n", songlist_name);
+        return;
     }
-    return curr;
+    char buf[300];
+    build_songlist(songlist_tree, songlist_name);
+    //printf("haha\n");
+    while (fgets(buf, 255, songFile) != NULL)
+    {
+        //printf("buf:'%s'\n",buf);
+        if ((strlen(buf) > 0) && (buf[strlen(buf) - 1] == '\n'))
+            buf[strlen(buf) - 1] = '\0';
+        song *songs = malloc(sizeof(song));
+        // Define the delimeter of the string
+        char delim[5] = ",/:";
+        //printf("buf2:'%s'\n",buf);
+        //printf("songs:'%p'\n",songs);
+        // Call the wcstok() method
+        char *tmp = strtok(buf, delim);
+        //song name
+        songs->song_name = (char *)malloc(sizeof(char) * (strlen(tmp) + 1));
+        strcpy(songs->song_name, tmp);
+        //printf("tmp1:'%s'\n",tmp);
+        //artist
+        tmp = strtok(NULL, delim);
+        songs->artist = (char *)malloc(sizeof(char) * (strlen(tmp) + 1));
+        strcpy(songs->artist, tmp);
+        //printf("tmp2:'%s'\n",tmp);
+        //length
+        tmp = strtok(NULL, delim);
+        float time = atof(tmp);
+        songs->length = time;
+        //time
+        strcat(delim," ");
+        tmp = strtok(NULL, delim);
+        int year = atoi(tmp);
+        songs->times.year=year;
+        
+        tmp = strtok(NULL, delim);
+        int month = atoi(tmp);
+        songs->times.month = month;
+
+        tmp = strtok(NULL, delim);
+        int day = atoi(tmp);
+        songs->times.day =day;
+
+        tmp = strtok(NULL, delim);
+        int hour = atoi(tmp);
+        songs->times.hour =hour;
+
+        tmp = strtok(NULL, delim);
+        int minute = atoi(tmp);
+        songs->times.minute =minute;
+        //like
+        tmp = strtok(NULL, delim);
+        int like = atoi(tmp);
+        songs->like = like;
+
+        songs->left_child = NULL;
+        songs->right_child = NULL;
+        songs->parent = NULL;
+        //printf("hehe\n");
+        build_song_data((&(*songlist_tree)->data),songs);
+        //printf("howow\n");
+    }
+    fclose(songFile);
+    printf("'%s.csv' has successfully imported.\n",songlist_name);
+    return;
+
+}
+void print_systimes(systime upload_time){
+    printf("%d/%d/%d ", upload_time.year, upload_time.month, upload_time.day);
+    printf("%d:%d\n", upload_time.hour, upload_time.minute);
+    // 打印當地時間
+    // if (upload_time.hour < 12) {    // 中午之前
+    //     printf("%d:%d\n", upload_time.hour, upload_time.minute);
+    // }
+    // else {    // 中午之後
+    //     printf("%d:%d\n", upload_time.hour - 12, upload_time.minute);
+    // }
+ 
+    //打印當前日期
+    
 }
